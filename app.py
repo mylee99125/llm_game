@@ -19,29 +19,10 @@ IMAGE_PATHS = {
     'gm_icon': 'assets/gm_avatar.png'
 }
 
-# --- 안정성 강화: 이미지 파일 존재 여부 체크 ---
-def check_image_files():
-    if not os.path.isdir('assets'):
-        st.error("Error: 'assets' 폴더를 찾을 수 없습니다! 코드 파일과 같은 위치에 만들어주세요.")
-        return False
-    for path in IMAGE_PATHS.values():
-        if not os.path.exists(path):
-            st.error(f"Error: '{path}' 이미지 파일을 찾을 수 없습니다! 'assets' 폴더에 넣어주세요.")
-            return False
-    return True
-
 # OpenAI 클라이언트 초기화
-if OPENAI_API_KEY:
-    try:
-        client = openai.OpenAI(api_key=OPENAI_API_KEY)
-    except Exception:
-        st.error("OpenAI 라이브러리 초기화에 실패했습니다.")
-        st.stop()
-else:
-    st.error("앗! .env 파일에 OPENAI_API_KEY가 설정되지 않았어요.")
-    st.stop()
+client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-# --- 3. 마스터 프롬프트 (✨ 이벤트 및 선택지 생성 강화 버전 ✨) ---
+# --- 3. 마스터 프롬프트 ---
 MASTER_PROMPT = """
 ### 역할 ###
 너는 '신입사원 생존기: 1999' 게임의 게임 마스터(GM)다.
@@ -70,7 +51,7 @@ NPC의 대사는 항상 "NPC이름: 대사" 형식으로 시작한다.
 이제, 플레이어가 흥미를 느낄만한 첫 번째 이벤트를 제시하며 게임을 시작해라. 반드시 2가지 선택지를 포함해야 한다.
 """
 
-# --- 4. UI 스타일링 (눈이 편안한 'Amber 터미널' 최종 버전) ---
+# --- 4. UI 스타일링 (눈이 편안한 'Amber 터미널' 버전) ---
 page_style = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&display=swap');
@@ -157,17 +138,18 @@ def initialize_game():
     update_stats_from_response(response_content)
 
 
-# ✨ 시간 업데이트를 파이썬에서 직접 처리하도록 수정
+# 시간 업데이트를 파이썬에서 직접 처리
 def update_stats_from_response(response):
     # 키워드 기반 시간 경과
     time_keywords = ['보고서', '회의', '완료', '끝', '심부름', '다녀왔', '점심', '휴식']
+
     # AI 응답에 키워드가 있고, 마지막 턴 이후로 시간이 흐르지 않았다면
     if any(keyword in response for keyword in time_keywords) and not st.session_state.get('time_passed_this_turn', False):
         hours_passed = random.choice([1, 2]) # 1~2시간 랜덤으로 경과
         current_hour = int(st.session_state.time.split(':')[0])
         new_hour = current_hour + hours_passed
         st.session_state.time = f"{new_hour:02d}:00"
-        st.session_state.time_passed_this_turn = True # 이번 턴에 시간이 흘렀음을 표시
+        st.session_state.time_passed_this_turn = True
 
     stat_changes = re.findall(r"\[(멘탈|업무 능력|사회성):\s*([+\-]\d+)\]", response)
     for stat_name, change in stat_changes:
@@ -192,7 +174,6 @@ def get_ai_response_content():
         return "앗, 죄송합니다! 잠시 문제가 발생한 것 같아요. 다른 행동을 입력해보시겠어요?"
 
 def generate_final_report_content():
-    # (이전과 동일)
     report_messages = [{"role": "system", "content": "너는 인사팀장이다. 아래의 대화 기록을 보고 신입사원의 첫날을 평가하는 보고서를 작성해라."}]
     for msg in st.session_state.chat_history:
         report_messages.append(msg)
@@ -211,9 +192,6 @@ def generate_final_report_content():
 
 # --- 6. Streamlit UI 구성 ---
 st.set_page_config(page_title="신입사원 생존기: 1999", layout="centered")
-
-if not check_image_files():
-    st.stop()
 
 st.markdown(page_style, unsafe_allow_html=True)
 
